@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>	<!-- 头文件，主要注意一下编码 -->
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/tx/spring-tx.xsd">
+        
+
+	<!-- spring提供的自动扫描机制：@Controller,@Service,@Repository,@Component -->
+	<context:component-scan base-package="org.framestudy.spring_mybatis" />
+	<context:property-placeholder location="classpath:mysql.properties" ignore-unresolvable="true"/>
+
+	<!-- 配置数据源（在WEB项目中，一般数据源特指数据库） -->
+	<!-- 该数据源只适合开发或者测试，不能用来商业生产环境，如果需要商业生产，那么可以使用 C3P0或者DBCP的连接池 -->
+	<!-- <bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"></bean> -->
+
+	<!-- 第一步，配置DBCP数据源连接池 -->
+	<!-- destroy-method="close" 通知连接池，在自身如果需要销毁的时候，需要关闭所有的链接 -->
+	<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" value="${jdbc.driverClassName}"></property>
+		<property name="url" value="${jdbc.url}"></property>
+		<property name="username" value="${jdbc.username}"></property>
+		<property name="password" value="${jdbc.password}"></property>
+		<property name="initialSize" value="${jdbc.initialSize}"></property>	<!-- 初始连接数 -->
+		<property name="maxActive" value="${jdbc.maxActive}"></property>	<!-- 最大连接数 -->
+		<property name="minIdle" value="5"></property>	<!-- 最小空闲数 -->
+		<property name="maxIdle" value="20"></property>	<!-- 最大空闲数 -->
+		<property name="removeAbandonedTimeout" value="100"></property>	<!-- 设置超时时间为10秒 -->
+		<property name="removeAbandoned" value="true"></property>	<!-- 是否回收超时连接 -->
+		<property name="defaultAutoCommit" value="false"></property>	<!-- 设置是否自动提交 -->
+		<property name="maxWait" value="1000"></property>	<!-- 超时等待时间设置为1000毫秒 -->	
+			
+		<!-- 在每次空闲连接回收器线程（如果有）运行时检查的连接数量 -->
+		<property name="numTestsPerEvictionRun" value="15"></property>	
+		
+		<!-- 连接被抛弃时是否打印输出到日志中 -->  
+        <property name="logAbandoned" value="true"/>
+        
+        <!-- 验证查询，获取当前连接数据库的时间 --> 
+		<property name="validationQuery" value="SELECT NOW() FROM DUAL"></property>
+	</bean>
+	
+	<!-- 第二步，配置SessionFactory SessionFactory才能创建对象 
+			来自于mybatis-spring.jar-->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource"></property>
+		
+		<!-- 给类取类别名 -->
+		<property name="typeAliasesPackage" value="
+		org.framestudy.spring_mybatis.usermag.beans;
+		org.framestudy.spring_mybatis.relationmag.beans"></property>	
+	</bean>	
+	
+	<!-- 第三步，配置SQL映射器的扫描 -->
+	<bean id="mapperSacnner" class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="
+		org.framestudy.spring_mybatis.usermag.mapper;
+		org.framestudy.spring_mybatis.relationmag.mapper"></property>
+		
+		<!-- 将SQL映射与Session进行关联 -->
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"></property>
+	</bean>
+	
+	<!-- 第四步，配置事务管理 -->
+	<!-- spring容器提供的 两次提交（预提交+最终提交） -->
+	<bean id="txManage" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+	
+	<!-- spring声明式事务管理方式（1）注解版，了解，不推荐 -->
+	<!-- 不处理事务，则任何方法以非事务方式处理业务流程 -->
+	<tx:annotation-driven transaction-manager="txManage"/>	
+	
+	
+	<!-- 
+		事务概念：一组具有明确边界的，并且具有一定顺序的执行过程。它是企业开发过程中不可缺少的一门技术。通常是用来确保一组执行过程的
+			完整性与一致性。
+		例子：张三给李四转钱，这就是一个完整的过程，任何一步都出问题，事务都是不完整的。
+		事务的四个特性：ACID
+			* 原子性Atomicity：事务是一个完整的过程，它是不可以再次划分的。
+			* 一致性Consistency：一旦事务进行，无论有多少个事务，处理事务的过程中，数据总是满足质量守恒定律。入多少必须出多少。
+			* 隔离性Isolation：事务与事务执行过程中，不同的事物之间是相互隔离，互不干涉的。
+			* 持久性Durability：事务一旦确定下来，它的结果也就必须要确认下来，不应该再次被同一事物进行破坏。如果想变动该事务，
+				要另起一个新的事务。
+		事务如果按照类型来进行分类：
+			* 逻辑事务：是为了保证业务逻辑的完整性与准确性
+			* 物理事务：也称为系统事务，是为了保证业务数据的准确性
+				通常来说，一个逻辑事务里面包含多个物理事务
+		在Spring框架内，处理事务通常有两种方式：
+			* 编程式事务：将事务管理的代码嵌入到业务逻辑的方法上，通过这种方式来控制事务的提交、回滚，这种方式简单粗暴
+				但是有一个缺点：在编程式事务控制中，必须在每个业务操作的方法上都包含额外的事务管理代码
+			* 声明式事务：将事务管理代码从业务逻辑中分离出来，交给spring容器提供的springAOP切面来进行管理，我们只需要在spring配置
+				文件中声明如何去管理事务就可以了，在企业应用开发中，声明式事务较为常见
+		事务的隔离级别：
+			* 可串行化Serializable：
+				事务处理的最高隔离级别，相当于线程同步后的结果，它不能保证你得到的是什么结果，但是至少可保证你得到的是准确的
+				其他的隔离级别虽然处理事务的效率上有所提升，但是都会在一定程度上导致数据的不准确
+			* 可重复读RePeatable read：
+				使用较为广泛
+				可重复读，它的隔离级别仅次于可串行化，但是它会产生一个问题：幻读，给操作中造成一个不应该有的幻觉
+				所谓的幻读：指当前事务不是独立执行时发生的情况，例如两个事务操作同一张表，A事务修改了表中的大部分数据并做了提交，但是尚未查询，
+				B事务刚好修改到A操作数据的一部分数据，此时A再查询，这是就会给A造成一种没有修改完全的幻觉
+					drop、truncate、delete 删除数据库的区别？
+			* 读已提交Read committed
+				读已提交的隔离级别仅次于可重复读，但是它同样也有一个问题：它会导致不可重复读
+				所谓的不可重复读是指，在数据库访问过程中，一个事务范围内两次或者多次的查询结果不一致，它是由于在读的间歇过程中，有另外一个事务
+				修改了同样的数据，从而导致前一个事务多次查询得到的结果不一致。
+				对于数据库而言，不可重复读要比幻读来的更加容易一些，因此，可重复读比读已提交有更好的正确性，所以项目中更多使用可重复读
+			* 读未提交Read uncommited
+				读未提交隔离级别最低，项目中几乎没有人使用，原因是它会对导致脏读
+				脏读的概念：事务在处理的过程中，可以读取到其他事务尚未提交的数据，然后拿着这个数据进行业务处理，
+				而这个数据最终可能不会提交（回滚）！
+			至于在项目中，具体应该采用哪种隔离级别，要根据系统所在的业务环境具体分析
+		
+		事务的传播：
+			当多个具有事务能力的Service实现类的方法互调的时候，所形成的复杂的事务边界控制问题。
+			在Spring框架中常见的事务传播控制方式有以下7种：
+			【调用者——被调用者 支持当前事务，是指调用者如果拥有事务，被调用者也要遵循该事务】
+				* REQUERED
+					支持当前事务，如果没有事务，就新建一个事务——（CUD、常用）
+				* REQUERED-NEW
+					无论调用者有没有事务，都新建一个新的事务，如果有事务，则将事务挂起，按照新的事务来执行
+				* SUPPORTS
+					如果有事务，则支持当前事务，如果没有事务，则以非事务的方式执行
+					（通常用在查询，因为有没有事务基本不会影响到查询操作）——（R、常用）
+				* MANDATORY
+					如果有事务，则支持当前事务，如果没有事务，则抛出无事务异常
+				* NOT-SUPPORTS
+					以非事务方式执行，如果有事务，就将事务挂起
+				* NEVER
+					绝对不能在事务环境下运行，如果有事务，就将事务挂起，该传播对应的方法只有在没有关联到事务的情况下才会执行
+				* NESTED
+					如果调用者与被调用者同时拥有事务，则将被调用者的事务嵌套到调用者的事务当中，如果没有事务，则按照第一种方式处理
+					
+		JTA 事务管理器：
+			数据库分布式，跨库进行事务管理
+		事务补偿：
+			通常发生在程序之间相互调用的时候（一个程序中完成的事务可以直接回滚，多个程序完成同一个事务时无法回滚）
+			消息队列服务器：
+				对实时性要求不高的情况下使用
+			
+	 -->
+	
+	
+	
+	
+	
+	
+
+	<!-- 开启springAOP动态代理的支持 -->
+	<!-- <aop:aspectj-autoproxy/> -->
+
+
+
+
+</beans>
