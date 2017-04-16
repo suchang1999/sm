@@ -69,14 +69,14 @@ public class TestUserService {
 	public void testBatchSaveUserInfo(){
 		List<UserInfo> users = new ArrayList<UserInfo>();
 		
-		UserInfo user1 = new UserInfo(1, "王大锤", "wangdachui8", "121212", 23);
+		UserInfo user1 = new UserInfo(1, "李达康", "lidakang1", "121212", 23);
 		try {
 			UserInfo user2 = (UserInfo) user1.clone();
-			user2.setLoginName("wangdachui9");
+			user2.setLoginName("lidakang2");
 			UserInfo user3 = (UserInfo) user1.clone();
-			user3.setLoginName("wangdachui10");
+			user3.setLoginName("lidakang3");
 			UserInfo user4 = (UserInfo) user1.clone();
-			user4.setLoginName("wangdachui11");
+			user4.setLoginName("lidakang4");
 			
 			users.add(user1);
 			users.add(user2);
